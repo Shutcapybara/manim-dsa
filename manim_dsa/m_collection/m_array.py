@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, override
+from typing import Any, Callable, override
 
 from manim import *
 from manim.typing import Vector3D
@@ -123,6 +123,7 @@ class MArray(MCollection):
         new_elem = MIndexedElement(
             Rectangle(**self.style.square), Text(str(value), **self.style.value)
         )
+        new_elem._sort_value = value
 
         self._append_helper(new_elem)
 
@@ -149,6 +150,125 @@ class MArray(MCollection):
             An animation that displays the new element being written into the array.
         """
         return super()._append_animation(value, anim_args)
+
+    def sort(self, *, key: Callable[[Any], Any] | None = None, reverse: bool = False) -> Self:
+        """Sorts the array in place, keeping indexes at their original positions.
+
+        Parameters
+        ----------
+        key : Callable[[Any], Any], optional
+            A function that returns a comparison key for each original Python value.
+            Default is ``None``, which compares the values directly.
+        reverse : bool, optional
+            Whether to sort in descending order. Default is ``False``.
+
+        Returns
+        -------
+        self
+            The instance of :class:`MArray` with its elements in sorted order.
+
+        Notes
+        -----
+        Sorting is stable: elements with equal comparison keys retain their relative order.
+        """
+        ordered = self._sorted_elements(key, reverse)
+        positions = [element.square.get_center().copy() for element in self.elements]
+        groups = self._sort_groups(ordered)
+        for element, group, position in zip(ordered, groups, positions):
+            group.shift(position - element.square.get_center())
+        self.elements[:] = ordered
+        return self
+
+    def _sorted_elements(self, key, reverse):
+        """Returns the elements in sorted order without modifying the array.
+
+        Parameters
+        ----------
+        key : Callable[[Any], Any] or None
+            A function applied to each original Python value to obtain its comparison key.
+            If ``None``, the values are compared directly.
+        reverse : bool
+            Whether to sort in descending order.
+
+        Returns
+        -------
+        list of MIndexedElement
+            The existing elements in sorted order, preserving the relative order of ties.
+        """
+        return sorted(
+            self.elements,
+            key=lambda element: (
+                key(element._sort_value) if key is not None else element._sort_value
+            ),
+            reverse=reverse,
+        )
+
+    def _sort_groups(self, ordered):
+        """Groups the moving parts of each element and reassigns stationary indexes.
+
+        Parameters
+        ----------
+        ordered : list of MIndexedElement
+            All existing array elements in their desired sorted order.
+
+        Returns
+        -------
+        list of :class:`~manim.mobject.types.vectorized_mobject.VGroup`
+            Groups containing each element's square, value, and any other submobjects
+            except its index, in the requested order.
+
+        Notes
+        -----
+        When indexing is enabled, index labels are reassigned to the elements that
+        will occupy their positions. The labels themselves are not moved.
+        """
+        indexes = [element.index for element in self.elements] if self._index_enabled else []
+        if self._index_enabled:
+            for element in self.elements:
+                element.remove(element.index)
+        groups = [VGroup(*element.submobjects) for element in ordered]
+        for element, index in zip(ordered, indexes):
+            element.index = index
+            element.add(index)
+        return groups
+
+    @override_animate(sort)
+    def _sort_animation(
+        self,
+        *,
+        key: Callable[[Any], Any] | None = None,
+        reverse: bool = False,
+        anim_args: dict = None,
+    ) -> Animation:
+        """Animates the array elements moving into sorted order, leaving indexes fixed.
+
+        Parameters
+        ----------
+        key : Callable[[Any], Any], optional
+            A function that returns a comparison key for each original Python value.
+            Default is ``None``, which compares the values directly.
+        reverse : bool, optional
+            Whether to sort in descending order. Default is ``False``.
+        anim_args : dict, optional
+            Additional arguments for the animation. Default is ``None``.
+
+        Returns
+        -------
+        :class:`~manim.animation.composition.AnimationGroup` or :class:`~manim.animation.animation.Wait`
+            An animation that moves the elements into sorted order, or a wait
+            animation when the array is empty.
+        """
+        ordered = self._sorted_elements(key, reverse)
+        positions = [element.square.get_center().copy() for element in self.elements]
+        groups = self._sort_groups(ordered)
+        animations = [
+            Transform(group, group.copy().shift(position - element.square.get_center()))
+            for element, group, position in zip(ordered, groups, positions)
+        ]
+        self.elements[:] = ordered
+        if not animations:
+            return Wait(**(anim_args or {}))
+        return AnimationGroup(*animations, group=self, **(anim_args or {}))
 
     @override
     def _update_style(self) -> None:

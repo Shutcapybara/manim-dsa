@@ -26,6 +26,7 @@ class MElement(VGroup, Highlightable):
         super().__init__()
         self.square = square
         self.value = value.move_to(self.square)
+        self._sort_value = value.text
         self._add_highlight(self.square)
         self += self.square
         self += self.value
@@ -49,6 +50,7 @@ class MElement(VGroup, Highlightable):
         """
         self -= self.value
         self.value = set_text(self.value, str(new_value))
+        self._sort_value = new_value
         self += self.value
         return self
 
