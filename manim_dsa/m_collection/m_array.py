@@ -151,7 +151,9 @@ class MArray(MCollection):
         """
         return super()._append_animation(value, anim_args)
 
-    def sort(self, *, key: Callable[[Any], Any] | None = None, reverse: bool = False) -> Self:
+    def sort(
+        self, *, key: Callable[[Any], Any] | None = None, reverse: bool = False
+    ) -> Self:
         """Sorts the array in place, keeping indexes at their original positions.
 
         Parameters
@@ -166,10 +168,6 @@ class MArray(MCollection):
         -------
         self
             The instance of :class:`MArray` with its elements in sorted order.
-
-        Notes
-        -----
-        Sorting is stable: elements with equal comparison keys retain their relative order.
         """
         ordered = self._sorted_elements(key, reverse)
         positions = [element.square.get_center().copy() for element in self.elements]
@@ -216,13 +214,10 @@ class MArray(MCollection):
         list of :class:`~manim.mobject.types.vectorized_mobject.VGroup`
             Groups containing each element's square, value, and any other submobjects
             except its index, in the requested order.
-
-        Notes
-        -----
-        When indexing is enabled, index labels are reassigned to the elements that
-        will occupy their positions. The labels themselves are not moved.
         """
-        indexes = [element.index for element in self.elements] if self._index_enabled else []
+        indexes = (
+            [element.index for element in self.elements] if self._index_enabled else []
+        )
         if self._index_enabled:
             for element in self.elements:
                 element.remove(element.index)
